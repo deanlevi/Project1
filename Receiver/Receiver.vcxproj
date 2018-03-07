@@ -146,7 +146,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\ItroductionToComputerNetworks\Project1\Project1\Receiver\main.c" />
+    <ClCompile Include="..\..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\ItroductionToComputerNetworks\Project1\Project1\Receiver\Main.c" />
+    <ClCompile Include="..\..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\ItroductionToComputerNetworks\Project1\Project1\Receiver\Receiver.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\ItroductionToComputerNetworks\Project1\Project1\Receiver\Receiver.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
