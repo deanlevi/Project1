@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{9F2CC115-25D1-4085-B1C4-F89B6E8E320B}</ProjectGuid>
+    <ProjectGuid>{3467EABD-B64D-4851-8B18-17EB6460FD9A}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>Receiver</RootNamespace>
+    <RootNamespace>Sender</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -146,7 +146,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\..\..\..\..\Dean%27s\Documents\Visual Studio 2015\Projects\ItroductionToComputerNetworks\Project1\Project1\Receiver\main.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
