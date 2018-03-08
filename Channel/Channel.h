@@ -14,15 +14,11 @@ typedef struct _ChannelProperties {
 	int ErrorProbability; // todo verify int
 	int RandomSeed; // todo verify int
 
-	SOCKET ListeningToReceiverSocket;
-	SOCKADDR_IN ListeningToReceiverSocketService;
+	SOCKET ReceiverSocket;
+	SOCKADDR_IN ReceiverSocketService;
 
-	SOCKET ListeningToSenderSocket;
-	SOCKADDR_IN ListeningToSenderSocketService;
-
-	//SOCKADDR_IN ChannelSocketService;
-	//int ChannelPortNum;
-	//char *ChannelIPAddress;
+	SOCKET ChannelSocket;
+	SOCKADDR_IN ChannelSocketService;
 }ChannelProperties;
 
 ChannelProperties Channel;
@@ -30,7 +26,6 @@ ChannelProperties Channel;
 void InitChannel(char *argv[]);
 void BindToPort();
 void HandleTraffic();
-//void HandleConnectionWithChannel();
-//void CloseSocketsAndWsaData();
+void CloseSocketsAndWsaData();
 
 #endif

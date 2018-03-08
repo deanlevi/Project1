@@ -12,6 +12,7 @@
 #define BINDING_SUCCEEDED 0
 #define BUFFER_LENGTH 2 // todo
 #define SEND_RECEIVE_FLAGS 0
+#define USER_INPUT_LENGTH 10
 
 void InitReceiver(char *argv[]) {
 	Receiver.LocalPortNum = atoi(argv[LOCAL_PORT_NUM_ARGUMENT_INDEX]);
@@ -24,8 +25,8 @@ void InitReceiver(char *argv[]) {
 		exit(ERROR_CODE);
 	}
 
-	Receiver.ListeningSocket = socket(AF_INET, SOCK_DGRAM, SOCKET_PROTOCOL);
-	if (Receiver.ListeningSocket == INVALID_SOCKET) {
+	Receiver.ReceiverSocket = socket(AF_INET, SOCK_DGRAM, SOCKET_PROTOCOL);
+	if (Receiver.ReceiverSocket == INVALID_SOCKET) {
 		printf("InitReceiver failed to create socket. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
@@ -34,36 +35,64 @@ void InitReceiver(char *argv[]) {
 
 void BindToPort() {
 	int BindingReturnValue;
-	Receiver.ListeningSocketService.sin_family = AF_INET;
-	Receiver.ListeningSocketService.sin_addr.s_addr = inet_addr(INADDR_ANY);
-	Receiver.ListeningSocketService.sin_port = htons(Receiver.LocalPortNum);
-	BindingReturnValue = bind(Receiver.ListeningSocket, (SOCKADDR*)&Receiver.ListeningSocketService,
-							  sizeof(Receiver.ListeningSocketService));
+	Receiver.ReceiverSocketService.sin_family = AF_INET;
+	Receiver.ReceiverSocketService.sin_addr.s_addr = inet_addr(INADDR_ANY);
+	Receiver.ReceiverSocketService.sin_port = htons(Receiver.LocalPortNum);
+	BindingReturnValue = bind(Receiver.ReceiverSocket, (SOCKADDR*)&Receiver.ReceiverSocketService,
+							  sizeof(Receiver.ReceiverSocketService));
 	if (BindingReturnValue != BINDING_SUCCEEDED) {
+		printf("BindToPort failed to bind.\n");
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
 	}
 }
 
 void HandleConnectionWithChannel() {
+	bool GotEndFromUser = false;
 	char ReceivedBuffer[BUFFER_LENGTH];
-	int ReceivedBufferLength = recvfrom(Receiver.ListeningSocket, &ReceivedBuffer, BUFFER_LENGTH, SEND_RECEIVE_FLAGS,
+	int ReceivedBufferLength = recvfrom(Receiver.ReceiverSocket, &ReceivedBuffer, BUFFER_LENGTH, SEND_RECEIVE_FLAGS,
 								   	   &Receiver.ChannelSocketService, NULL);
 	SavePortAndIPOfChannel();
 	CreateOutputFile();
+	WriteInputToOutputFile(ReceivedBuffer, ReceivedBufferLength); // todo
+	ProcessInput(ReceivedBuffer, ReceivedBufferLength); // todo
+
+	fd_set Allfds;
+	fd_set Readfds;
+	int Status;
+	FD_ZERO(&Allfds);
+	FD_SET(Receiver.ReceiverSocket, &Allfds);
+	FD_SET(stdin, &Allfds);
+
 	while (TRUE) {
-		WriteInputToOutputFile(ReceivedBuffer, ReceivedBufferLength); // todo
-		ProcessInput(ReceivedBuffer, ReceivedBufferLength); // todo
-		if (CheckForEnd(ReceivedBuffer, ReceivedBufferLength)) { // todo
-			break;
+		Readfds = Allfds;
+		Status = select(0, &Readfds, NULL, NULL, NULL);
+		if (Status == SOCKET_ERROR) {
+			printf("HandleConnectionWithChannel select failure.\n");
+			CloseSocketsAndWsaData();
+			exit(ERROR_CODE);
 		}
-		ReceivedBufferLength = recvfrom(Receiver.ListeningSocket, &ReceivedBuffer, BUFFER_LENGTH, SEND_RECEIVE_FLAGS, NULL, NULL);
+		else if (Status == 0) {
+			continue;
+		}
+		else {
+			if (FD_ISSET(Receiver.ReceiverSocket, &Readfds)) {
+				HandleReceiveFromChannel(); // todo
+			}
+			if (FD_ISSET(stdin, &Readfds)) {
+				HandleUserInput(&GotEndFromUser); // todo
+				if (GotEndFromUser) {
+					break;
+				}
+			}
+		}
+
 	}
 	SendInformationToChannel(); // todo
 	//printf(); // todo
 }
 
-void SavePortAndIPOfChannel() {
+void SavePortAndIPOfChannel() { // todo - remove
 	Receiver.ChannelPortNum = (int)ntohs(Receiver.ChannelSocketService.sin_port);
 	Receiver.ChannelIPAddress = inet_ntoa(Receiver.ChannelSocketService.sin_addr);
 }
@@ -78,9 +107,28 @@ void CreateOutputFile() {
 	fclose(OutputFilePointer);
 }
 
+void HandleReceiveFromChannel() {
+	char ReceivedBuffer[BUFFER_LENGTH];
+	int ReceivedBufferLength = recvfrom(Receiver.ReceiverSocket, &ReceivedBuffer, BUFFER_LENGTH, SEND_RECEIVE_FLAGS, NULL, NULL);
+
+	WriteInputToOutputFile(ReceivedBuffer, ReceivedBufferLength); // todo // todo check if write before/after correcting error
+	ProcessInput(ReceivedBuffer, ReceivedBufferLength); // todo
+}
+
+void HandleUserInput(bool *GotEndFromUser) {
+	char UserInput[USER_INPUT_LENGTH];
+	scanf("%s", UserInput);
+	if (strcmp(UserInput, "End") == 0) {
+		*GotEndFromUser = true;
+	}
+	else {
+		printf("Not a valid input. To finish enter 'End'.\n");
+	}
+}
+
 void CloseSocketsAndWsaData() { // todo check
 	int CloseSocketReturnValue;
-	CloseSocketReturnValue = closesocket(Receiver.ListeningSocket); // todo add if adding more sockets
+	CloseSocketReturnValue = closesocket(Receiver.ReceiverSocket); // todo add if adding more sockets
 	if (CloseSocketReturnValue == SOCKET_ERROR) {
 		printf("CloseSocketsAndWsaData failed to close socket. Error Number is %d\n", WSAGetLastError());
 		exit(ERROR_CODE);

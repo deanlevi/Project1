@@ -11,8 +11,8 @@ typedef struct _ReceiverProperties {
 	int LocalPortNum;
 	char *OutputFileName;
 
-	SOCKET ListeningSocket;
-	SOCKADDR_IN ListeningSocketService;
+	SOCKET ReceiverSocket;
+	SOCKADDR_IN ReceiverSocketService;
 
 	SOCKADDR_IN ChannelSocketService;
 	int ChannelPortNum;
