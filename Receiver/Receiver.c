@@ -6,15 +6,16 @@
 
 #include "Receiver.h"
 
+#define LOCAL_PORT_NUM_ARGUMENT_INDEX 1
+#define OUTPUT_FILE_NAME_ARGUMENT_INDEX 2
 #define SOCKET_PROTOCOL 0
-#define SERVER_ADDRESS_STR "127.0.0.1"
 #define BINDING_SUCCEEDED 0
 #define BUFFER_LENGTH 2 // todo
 #define SEND_RECEIVE_FLAGS 0
 
 void InitReceiver(char *argv[]) {
-	Receiver.LocalPortNum = atoi(argv[1]);
-	Receiver.OutputFileName = argv[2];
+	Receiver.LocalPortNum = atoi(argv[LOCAL_PORT_NUM_ARGUMENT_INDEX]);
+	Receiver.OutputFileName = argv[OUTPUT_FILE_NAME_ARGUMENT_INDEX];
 	
 	WSADATA wsaData;
 	int StartupRes = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -25,7 +26,7 @@ void InitReceiver(char *argv[]) {
 
 	Receiver.ListeningSocket = socket(AF_INET, SOCK_DGRAM, SOCKET_PROTOCOL);
 	if (Receiver.ListeningSocket == INVALID_SOCKET) {
-		printf("ConnectToPort failed to create socket. Error Number is %d\n", WSAGetLastError());
+		printf("InitReceiver failed to create socket. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -34,7 +35,7 @@ void InitReceiver(char *argv[]) {
 void BindToPort() {
 	int BindingReturnValue;
 	Receiver.ListeningSocketService.sin_family = AF_INET;
-	Receiver.ListeningSocketService.sin_addr.s_addr = inet_addr(SERVER_ADDRESS_STR); // todo verify
+	Receiver.ListeningSocketService.sin_addr.s_addr = inet_addr(INADDR_ANY);
 	Receiver.ListeningSocketService.sin_port = htons(Receiver.LocalPortNum);
 	BindingReturnValue = bind(Receiver.ListeningSocket, (SOCKADDR*)&Receiver.ListeningSocketService,
 							  sizeof(Receiver.ListeningSocketService));
