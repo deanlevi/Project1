@@ -19,6 +19,7 @@ typedef struct _SenderProperties {
 SenderProperties Sender;
 
 void InitSender(char *argv[]);
+void HandleSendFile();
 void CloseSocketsAndWsaData();
 
 #endif

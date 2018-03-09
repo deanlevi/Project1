@@ -19,6 +19,8 @@ typedef struct _ChannelProperties {
 
 	SOCKET ChannelSocket;
 	SOCKADDR_IN ChannelSocketService;
+
+	SOCKADDR_IN SenderSocketService;
 }ChannelProperties;
 
 ChannelProperties Channel;

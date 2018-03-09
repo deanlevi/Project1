@@ -1,4 +1,7 @@
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "Channel.h"
 
@@ -9,7 +12,18 @@
 #define RANDOM_SEED_ARGUMENT_INDEX 5
 #define SOCKET_PROTOCOL 0
 #define BINDING_SUCCEEDED 0
-#define BUFFER_LENGTH 2 // todo
+#define BUFFER_LENGTH 20 // todo // todo remove const
+#define SEND_RECEIVE_FLAGS 0
+#define CHUNK_SIZE 8
+#define ERROR_CONST 65536 // = 2^16
+
+void InitChannel(char *argv[]);
+void BindToPort();
+void HandleTraffic();
+void HandleReceiveFromSender(unsigned long long ReceivedBuffer, int ReceivedBufferLength);
+void InsertErrors(unsigned long long *ReceivedBuffer);
+void HandleReceiveFromReceiver(unsigned long long ReceivedBuffer, int ReceivedBufferLength);
+void CloseSocketsAndWsaData();
 
 void InitChannel(char *argv[]) {
 	Channel.LocalPortNum = atoi(argv[LOCAL_PORT_NUM_ARGUMENT_INDEX]);
@@ -17,6 +31,10 @@ void InitChannel(char *argv[]) {
 	Channel.ReceiverPortNum = atoi(argv[RECEIVER_PORT_NUM_ARGUMENT_INDEX]);
 	Channel.ErrorProbability = atoi(argv[ERROR_PROBABILITY_ARGUMENT_INDEX]);
 	Channel.RandomSeed = atoi(argv[RANDOM_SEED_ARGUMENT_INDEX]);
+	Channel.ReceiverSocketService.sin_family = AF_INET;
+	Channel.ReceiverSocketService.sin_addr.s_addr = inet_addr(Channel.ReceiverIPAddress);
+	Channel.ReceiverSocketService.sin_port = htons(Channel.ReceiverPortNum);
+	srand(Channel.RandomSeed);
 
 	WSADATA wsaData;
 	int StartupRes = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -41,7 +59,7 @@ void InitChannel(char *argv[]) {
 
 void BindToPort() { // todo check binding
 	int BindingReturnValue;
-	Channel.ReceiverSocketService.sin_family = AF_INET;
+	/*Channel.ReceiverSocketService.sin_family = AF_INET; // todo check
 	Channel.ReceiverSocketService.sin_addr.s_addr = inet_addr(Channel.ReceiverIPAddress);
 	Channel.ReceiverSocketService.sin_port = htons(Channel.ReceiverPortNum);
 	BindingReturnValue = bind(Channel.ReceiverSocket, (SOCKADDR*)&Channel.ReceiverSocketService,
@@ -50,9 +68,9 @@ void BindToPort() { // todo check binding
 		printf("BindToPort failed to bind.\n");
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
-	}
+	}*/
 	Channel.ChannelSocketService.sin_family = AF_INET;
-	Channel.ChannelSocketService.sin_addr.s_addr = inet_addr(INADDR_ANY);
+	Channel.ChannelSocketService.sin_addr.s_addr = INADDR_ANY;
 	Channel.ChannelSocketService.sin_port = htons(Channel.LocalPortNum);
 	BindingReturnValue = bind(Channel.ChannelSocket, (SOCKADDR*)&Channel.ChannelSocketService,
 							  sizeof(Channel.ChannelSocketService));
@@ -64,6 +82,8 @@ void BindToPort() { // todo check binding
 }
 
 void HandleTraffic() {
+	//struct timeval Tv; // todo remove
+	//Tv.tv_sec = 20; // todo remove
 	fd_set Allfds;
 	fd_set Readfds;
 	int Status;
@@ -71,11 +91,23 @@ void HandleTraffic() {
 	FD_SET(Channel.ReceiverSocket, &Allfds);
 	FD_SET(Channel.ChannelSocket, &Allfds);
 
+	//char ReceivedBuffer[BUFFER_LENGTH]; // todo check if need void[] // todo // todo remove const
+	unsigned long long ReceivedBuffer;
+	int FromLen = sizeof(Channel.SenderSocketService);
+	int ReceivedBufferLength = recvfrom(Channel.ChannelSocket, &ReceivedBuffer, CHUNK_SIZE, SEND_RECEIVE_FLAGS,
+								   	   (SOCKADDR*)&Channel.SenderSocketService, &FromLen);
+	if (ReceivedBufferLength == SOCKET_ERROR) {
+		printf("HandleTraffic failed to recvfrom. Error Number is %d\n", WSAGetLastError());
+		CloseSocketsAndWsaData();
+		exit(ERROR_CODE);
+	}
+	HandleReceiveFromSender(ReceivedBuffer, ReceivedBufferLength); // todo
+
 	while (TRUE) {
 		Readfds = Allfds;
 		Status = select(0, &Readfds, NULL, NULL, NULL);
 		if (Status == SOCKET_ERROR) {
-			printf("HandleTraffic select failure.\n");
+			printf("HandleTraffic select failure. Error Number is %d\n", WSAGetLastError());
 			CloseSocketsAndWsaData();
 			exit(ERROR_CODE);
 		}
@@ -84,10 +116,22 @@ void HandleTraffic() {
 		}
 		else {
 			if (FD_ISSET(Channel.ChannelSocket, &Readfds)) {
-				HandleReceiveFromSender(); // todo
+				ReceivedBufferLength = recvfrom(Channel.ChannelSocket, &ReceivedBuffer, CHUNK_SIZE, SEND_RECEIVE_FLAGS, NULL, NULL);
+				if (ReceivedBufferLength == SOCKET_ERROR) {
+					printf("HandleTraffic failed to recvfrom. Error Number is %d\n", WSAGetLastError());
+					CloseSocketsAndWsaData();
+					exit(ERROR_CODE);
+				}
+				HandleReceiveFromSender(ReceivedBuffer, ReceivedBufferLength); // todo
 			}
 			if (FD_ISSET(Channel.ReceiverSocket, &Readfds)) {
-				HandleReceiveFromReceiver(); // todo
+				ReceivedBufferLength = recvfrom(Channel.ReceiverSocket, &ReceivedBuffer, CHUNK_SIZE, SEND_RECEIVE_FLAGS, NULL, NULL);
+				if (ReceivedBufferLength == SOCKET_ERROR) {
+					printf("HandleTraffic failed to recvfrom. Error Number is %d\n", WSAGetLastError());
+					CloseSocketsAndWsaData();
+					exit(ERROR_CODE);
+				}
+				HandleReceiveFromReceiver(ReceivedBuffer, ReceivedBufferLength); // todo
 				break;
 			}
 		}
@@ -95,9 +139,41 @@ void HandleTraffic() {
 	// todo need to close connection/s
 }
 
-void HandleReceiveFromSender() {
-	char ReceivedBuffer[BUFFER_LENGTH];
-	int ReceivedBufferLength = recvfrom(Receiver.ListeningSocket, &ReceivedBuffer, BUFFER_LENGTH, SEND_RECEIVE_FLAGS, NULL, NULL);
+void HandleReceiveFromSender(unsigned long long ReceivedBuffer, int ReceivedBufferLength) { // todo
+	InsertErrors(&ReceivedBuffer);
+	int SentBufferLength = sendto(Channel.ReceiverSocket, &ReceivedBuffer, ReceivedBufferLength, SEND_RECEIVE_FLAGS,
+								 (SOCKADDR*)&Channel.ReceiverSocketService, sizeof(Channel.ReceiverSocketService));
+	if (SentBufferLength == SOCKET_ERROR) {
+		printf("HandleReceiveFromSender failed to sendto. Error Number is %d\n", WSAGetLastError());
+		CloseSocketsAndWsaData();
+		exit(ERROR_CODE);
+	}
+}
+
+void InsertErrors(unsigned long long *ReceivedBuffer) { // todo check bonus
+	if (Channel.ErrorProbability == 0) {
+		return;
+	}
+	unsigned int TotalNumberOfOptionsToError = ERROR_CONST / Channel.ErrorProbability;
+	int IndexInBuffer = 0;
+	unsigned long long ErrorMask = 0;
+	for (; IndexInBuffer < (CHUNK_SIZE * 8); IndexInBuffer++) {
+		if ((rand() % TotalNumberOfOptionsToError) == 1) {
+			ErrorMask += 1;
+		}
+		ErrorMask = ErrorMask << 1;
+	}
+	*ReceivedBuffer = *ReceivedBuffer ^ ErrorMask;
+}
+
+void HandleReceiveFromReceiver(unsigned long long ReceivedBuffer, int ReceivedBufferLength) { // todo
+	int SentBufferLength = sendto(Channel.ChannelSocket, &ReceivedBuffer, ReceivedBufferLength, SEND_RECEIVE_FLAGS,
+								 (SOCKADDR*)&Channel.SenderSocketService, sizeof(Channel.SenderSocketService));
+	if (SentBufferLength == SOCKET_ERROR) {
+		printf("HandleReceiveFromReceiver failed to sendto. Error Number is %d\n", WSAGetLastError());
+		CloseSocketsAndWsaData();
+		exit(ERROR_CODE);
+	}
 }
 
 void CloseSocketsAndWsaData() {
