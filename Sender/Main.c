@@ -11,6 +11,7 @@ int main(int argc, char *argv[]) {
 	}
 	InitSender(argv);
 	HandleSendFile();
+	HandleReceiveFromChannel();
 	CloseSocketsAndWsaData();
 	return SUCCESS_CODE;
 }

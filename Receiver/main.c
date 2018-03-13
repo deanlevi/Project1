@@ -11,8 +11,8 @@ int main(int argc, char *argv[]) {
 	}
 	InitReceiver(argv);
 	BindToPort();
-	HandleConnectionWithChannel();
+	HandleReceiver();
 
-	CloseSocketsAndWsaData();
+	CloseSocketsThreadsAndWsaData();
 	return SUCCESS_CODE;
 }

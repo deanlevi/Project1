@@ -17,10 +17,13 @@
 #define NUM_OF_ERROR_BITS 15
 #define NUM_OF_BITS_IN_A_ROW_COLUMN 7
 #define SEND_RECEIVE_FLAGS 0
+#define MESSAGE_LENGTH 20
+#define SEND_MESSAGES_WAIT 100
 
 void InitSender(char *argv[]);
 void AddErrorFixingBits(unsigned long long *DataToSend);
 void SendData(unsigned long long DataToSend);
+void ParseParameter(int *ParameterToUpdate, int *StartIndex, int *EndIndex, char MessageFromChannel[MESSAGE_LENGTH]);
 void CloseSocketsAndWsaData();
 
 void InitSender(char *argv[]) {
@@ -54,9 +57,10 @@ void HandleSendFile() {
 		exit(ERROR_CODE);
 	}
 	unsigned long long InputChunk = 0, DataToSend = 0, DataToSendNext = 0, TempData = 0;
-	char *DataToSendAsString; // todo
 	int DataToSendNextOffset = 0;
 	size_t ReadElements;
+	Sleep(SEND_MESSAGES_WAIT); // if starting all at the same time
+
 	while (TRUE) {
 		if (DataToSendNextOffset < NUM_OF_DATA_BITS_IN_ONE_CHUNK) {
 			ReadElements = fread(&InputChunk, INPUT_CHUNK_SIZE, 1, InputFilePointer);
@@ -74,8 +78,8 @@ void HandleSendFile() {
 			DataToSendNext = 0;
 			DataToSendNextOffset = 0;
 		}
+		char *Temp = &InputChunk; // todo remove
 		AddErrorFixingBits(&DataToSend);
-		//DataToSendAsString = (char *)&DataToSend; // todo
 		SendData(DataToSend);
 		InputChunk = 0;
 	}
@@ -86,11 +90,12 @@ void SendData(unsigned long long DataToSend) {
 	int SentBufferLength = sendto(Sender.ChannelSocket, &DataToSend, OUTPUT_CHUNK_SIZE, SEND_RECEIVE_FLAGS,
 								 (SOCKADDR*)&Sender.ChannelSocketService, sizeof(Sender.ChannelSocketService));
 	if (SentBufferLength == SOCKET_ERROR) {
-		printf("TempSendData failed to sendto. Error Number is %d\n", WSAGetLastError());
+		printf("SendData failed to sendto. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
 	}
-	Sleep(1000); // todo
+	printf("SendData sent %llu  Pure data is %llu\n", DataToSend, DataToSend & 0x1FFFFFFFFFFFF); // todo remove
+	Sleep(SEND_MESSAGES_WAIT);
 }
 
 void AddErrorFixingBits(unsigned long long *DataToSend) {
@@ -113,7 +118,7 @@ void AddErrorFixingBits(unsigned long long *DataToSend) {
 		RowParity = 0;
 		ColumnParity = 0;
 	}
-	ErrorBits = ErrorBits + (DiagonalParity << NUM_OF_ERROR_BITS); // ErrorBits are 15 bits
+	ErrorBits = ErrorBits + (DiagonalParity << (NUM_OF_ERROR_BITS - 1)); // ErrorBits are 15 bits
 	ErrorBits = ErrorBits << (NUM_OF_BITS_IN_A_ROW_COLUMN*NUM_OF_BITS_IN_A_ROW_COLUMN); // shift 49 to the left
 	*DataToSend = *DataToSend + ErrorBits; // make error bits msb of data
 }
@@ -131,6 +136,63 @@ void AddErrorFixingBits(unsigned long long *DataToSend) {
 		exit(ERROR_CODE);
 	}
 }*/
+
+void HandleReceiveFromChannel() {
+	char MessageFromChannel[MESSAGE_LENGTH];
+	int ReceivedBufferLength;
+	fd_set Allfds;
+	fd_set Readfds;
+	int Status;
+	FD_ZERO(&Allfds);
+	FD_SET(Sender.ChannelSocket, &Allfds);
+
+	while (TRUE) {
+		Readfds = Allfds;
+		Status = select(0, &Readfds, NULL, NULL, NULL);
+		if (Status == SOCKET_ERROR) {
+			printf("HandleReceiveFromChannel select failure. Error Number is %d\n", WSAGetLastError());
+			CloseSocketsAndWsaData();
+			exit(ERROR_CODE);
+		}
+		else if (Status == 0) {
+			continue;
+		}
+		else {
+			if (FD_ISSET(Sender.ChannelSocket, &Readfds)) {
+				ReceivedBufferLength = recvfrom(Sender.ChannelSocket, MessageFromChannel, MESSAGE_LENGTH, SEND_RECEIVE_FLAGS, NULL, NULL);
+				if (ReceivedBufferLength == SOCKET_ERROR) {
+					printf("HandleReceiveFromChannel failed to recvfrom. Error Number is %d\n", WSAGetLastError());
+					CloseSocketsAndWsaData();
+					exit(ERROR_CODE);
+				}
+				break;
+			}
+		}
+	}
+	printf("HandleReceiveFromChannel received from receiver %s\n", MessageFromChannel); // todo remove
+	int NumberOfReceivedBytes, NumberOfWrittenBytes, NumberOfErrorsDetected, NumberOfErrorsCorrected;
+	int StartIndex = 0, EndIndex = 0;
+
+	ParseParameter(&NumberOfReceivedBytes, &StartIndex, &EndIndex, MessageFromChannel);
+	ParseParameter(&NumberOfWrittenBytes, &StartIndex, &EndIndex, MessageFromChannel);
+	ParseParameter(&NumberOfErrorsDetected, &StartIndex, &EndIndex, MessageFromChannel);
+	ParseParameter(&NumberOfErrorsCorrected, &StartIndex, &EndIndex, MessageFromChannel);
+
+	fprintf(stderr, "received: %d bytes\n", NumberOfReceivedBytes);
+	fprintf(stderr, "wrote: %d bytes\n", NumberOfWrittenBytes);
+	fprintf(stderr, "detected: %d errors, corrected: %d errors\n", NumberOfErrorsDetected, NumberOfErrorsCorrected);
+}
+
+void ParseParameter(int *ParameterToUpdate, int *StartIndex, int *EndIndex, char MessageFromChannel[MESSAGE_LENGTH]) {
+	char ParameterAsString[MESSAGE_LENGTH];
+	while (MessageFromChannel[*EndIndex] != '\n') {
+		(*EndIndex)++;
+	}
+	strncpy(ParameterAsString, MessageFromChannel + *StartIndex, *EndIndex - *StartIndex);
+	*ParameterToUpdate = atoi(ParameterAsString);
+	(*EndIndex)++;
+	*StartIndex = *EndIndex;
+}
 
 void CloseSocketsAndWsaData() {
 	int CloseSocketReturnValue;

@@ -20,6 +20,7 @@ SenderProperties Sender;
 
 void InitSender(char *argv[]);
 void HandleSendFile();
+void HandleReceiveFromChannel();
 void CloseSocketsAndWsaData();
 
 #endif

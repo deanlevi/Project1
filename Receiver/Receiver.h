@@ -2,6 +2,7 @@
 #define RECEIVER_H
 
 #include <WinSock2.h>
+#include <stdbool.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -17,13 +18,27 @@ typedef struct _ReceiverProperties {
 	SOCKADDR_IN ChannelSocketService;
 	int ChannelPortNum;
 	char *ChannelIPAddress;
+
+	HANDLE ConnectionWithChannelThreadHandle;
+	DWORD ConnectionWithChannelThreadID;
+
+	HANDLE UserInterfaceThreadHandle;
+	DWORD UserInterfaceThreadID;
+	bool GotEndFromUser;
+
+	int NumberOfReceivedBytes;
+	int NumberOfWrittenBits;
+	int NumberOfErrorsDetected;
+	int NumberOfErrorsCorrected;
+	int NumberOfSpareDataBits;
+	unsigned long long SpareDataBitsForNextChunk;
 }ReceiverProperties;
 
 ReceiverProperties Receiver;
 
 void InitReceiver(char *argv[]);
 void BindToPort();
-void HandleConnectionWithChannel();
-void CloseSocketsAndWsaData();
+void HandleReceiver();
+void CloseSocketsThreadsAndWsaData();
 
 #endif
