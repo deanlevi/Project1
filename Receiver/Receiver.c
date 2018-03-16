@@ -53,13 +53,13 @@ void InitReceiver(char *argv[]) {
 	WSADATA wsaData;
 	int StartupRes = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (StartupRes != NO_ERROR) {
-		printf("Error %ld at WSAStartup().\nExiting...\n", StartupRes);
+		fprintf(stderr, "Error %ld at WSAStartup().\nExiting...\n", StartupRes);
 		exit(ERROR_CODE);
 	}
 
 	Receiver.ReceiverSocket = socket(AF_INET, SOCK_DGRAM, SOCKET_PROTOCOL);
 	if (Receiver.ReceiverSocket == INVALID_SOCKET) {
-		printf("InitReceiver failed to create socket. Error Number is %d\n", WSAGetLastError());
+		fprintf(stderr, "InitReceiver failed to create socket. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -73,7 +73,7 @@ void BindToPort() {
 	BindingReturnValue = bind(Receiver.ReceiverSocket, (SOCKADDR*)&Receiver.ReceiverSocketService,
 							  sizeof(Receiver.ReceiverSocketService));
 	if (BindingReturnValue != BINDING_SUCCEEDED) {
-		printf("BindToPort failed to bind.\n");
+		fprintf(stderr, "BindToPort failed to bind.\n");
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -90,7 +90,7 @@ void HandleReceiver() {
 	DWORD wait_code;
 	wait_code = WaitForMultipleObjects(NUM_OF_THREADS, ThreadsArray, TRUE, INFINITE);
 	if (WAIT_OBJECT_0 != wait_code) {
-		printf("HandleReceiver failed to WaitForMultipleObjects.\n");
+		fprintf(stderr, "HandleReceiver failed to WaitForMultipleObjects.\n");
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -108,7 +108,7 @@ HANDLE CreateThreadSimple(LPTHREAD_START_ROUTINE p_start_routine, LPVOID p_threa
 		p_thread_id);        /*  returns the thread identifier */
 
 	if (NULL == thread_handle) {
-		printf("CreateThreadSimple failed to create thread.\n");
+		fprintf(stderr, "CreateThreadSimple failed to create thread.\n");
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -121,11 +121,11 @@ void WINAPI ConnectionWithChannelThread() {
 	int ReceivedBufferLength = recvfrom(Receiver.ReceiverSocket, &ReceivedBuffer, CHUNK_SIZE_IN_BYTES, SEND_RECEIVE_FLAGS,
 								   	   (SOCKADDR*)&Receiver.ChannelSocketService, &FromLen);
 	if (ReceivedBufferLength == SOCKET_ERROR || ReceivedBufferLength != CHUNK_SIZE_IN_BYTES) {
-		printf("ConnectionWithChannelThread failed to recvfrom. Error Number is %d\n", WSAGetLastError());
+		fprintf(stderr, "ConnectionWithChannelThread failed to recvfrom. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
-	printf("ConnectionWithChannelThread received from channel %llu\n", ReceivedBuffer); // todo remove
+	fprintf(stderr, "ConnectionWithChannelThread received from channel %llu\n", ReceivedBuffer); // todo remove
 	CreateOutputFile();
 	Receiver.NumberOfReceivedBytes += ReceivedBufferLength;
 	FindAndFixError(&ReceivedBuffer);
@@ -144,7 +144,7 @@ void WINAPI ConnectionWithChannelThread() {
 		Readfds = Allfds;
 		Status = select(0, &Readfds, NULL, NULL, &Tv);
 		if (Status == SOCKET_ERROR) {
-			printf("ConnectionWithChannelThread select failure. Error Number is %d\n", WSAGetLastError());
+			fprintf(stderr, "ConnectionWithChannelThread select failure. Error Number is %d\n", WSAGetLastError());
 			CloseSocketsThreadsAndWsaData();
 			exit(ERROR_CODE);
 		}
@@ -172,7 +172,7 @@ void WINAPI UserInterfaceThread() {
 			break;
 		}
 		else {
-			printf("Not a valid input. To finish enter 'End'.\n");
+			fprintf(stderr, "Not a valid input. To finish enter 'End'.\n");
 		}
 	}
 }
@@ -180,7 +180,7 @@ void WINAPI UserInterfaceThread() {
 void CreateOutputFile() {
 	FILE *OutputFilePointer = fopen(Receiver.OutputFileName, "w");
 	if (OutputFilePointer == NULL) {
-		printf("CreateOutputFile couldn't open output file.\n");
+		fprintf(stderr, "CreateOutputFile couldn't open output file.\n");
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -235,14 +235,14 @@ void FindAndFixError(unsigned long long *ReceivedBuffer) {
 		DataBits = DataBits ^ FixMask;
 		*ReceivedBuffer = DataBits; // no need to add error bits
 		Receiver.NumberOfErrorsCorrected++;
-		printf("FindAndFixError fixed data is %llu\n", *ReceivedBuffer); // todo remove
+		fprintf(stderr, "FindAndFixError fixed data is %llu\n", *ReceivedBuffer); // todo remove
 	}
 }
 
 void WriteInputToOutputFile(unsigned long long ReceivedBuffer) { // todo fix
 	FILE *OutputFilePointer = fopen(Receiver.OutputFileName, "a");
 	if (OutputFilePointer == NULL) {
-		printf("WriteInputToOutputFile couldn't open output file.\n");
+		fprintf(stderr, "WriteInputToOutputFile couldn't open output file.\n");
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -269,7 +269,7 @@ void WriteInputToOutputFile(unsigned long long ReceivedBuffer) { // todo fix
 	char *Temp = &DataToWrite;
 	WroteElements = fwrite(&DataToWrite, DATA_TO_WRITE_IN_BYTES, 1, OutputFilePointer);
 	if (WroteElements != 1) {
-		printf("WriteInputToOutputFile error in writing to file.\n");
+		fprintf(stderr, "WriteInputToOutputFile error in writing to file.\n");
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -281,12 +281,13 @@ void HandleReceiveFromChannel() {
 	unsigned long long ReceivedBuffer;
 	int ReceivedBufferLength = recvfrom(Receiver.ReceiverSocket, &ReceivedBuffer, CHUNK_SIZE_IN_BYTES, SEND_RECEIVE_FLAGS, NULL, NULL);
 	if (ReceivedBufferLength == SOCKET_ERROR) {
-		printf("HandleReceiveFromChannel failed to recvfrom. Error Number is %d\n", WSAGetLastError());
+		fprintf(stderr, "HandleReceiveFromChannel failed to recvfrom. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
-	printf("HandleReceiveFromChannel received from channel %llu\n", ReceivedBuffer); // todo remove
+	fprintf(stderr, "HandleReceiveFromChannel received from channel %llu\n", ReceivedBuffer); // todo remove
 	Receiver.NumberOfReceivedBytes += ReceivedBufferLength;
+	FindAndFixError(&ReceivedBuffer);
 	WriteInputToOutputFile(ReceivedBuffer); // todo check if write before/after correcting error
 }
 
@@ -297,7 +298,7 @@ void SendInformationToChannel() {
 	int SentBufferLength = sendto(Receiver.ReceiverSocket, MessageToChannel, strlen(MessageToChannel), SEND_RECEIVE_FLAGS,
 								 (SOCKADDR*)&Receiver.ChannelSocketService, sizeof(Receiver.ChannelSocketService));
 	if (SentBufferLength == SOCKET_ERROR) {
-		printf("SendInformationToChannel failed to sendto. Error Number is %d\n", WSAGetLastError());
+		fprintf(stderr, "SendInformationToChannel failed to sendto. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsThreadsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -308,25 +309,25 @@ void CloseSocketsThreadsAndWsaData() { // todo check // todo add threads
 	DWORD ret_val;
 	CloseSocketReturnValue = closesocket(Receiver.ReceiverSocket); // todo add if adding more sockets
 	if (CloseSocketReturnValue == SOCKET_ERROR) {
-		printf("CloseSocketsThreadsAndWsaData failed to close socket. Error Number is %d\n", WSAGetLastError());
+		fprintf(stderr, "CloseSocketsThreadsAndWsaData failed to close socket. Error Number is %d\n", WSAGetLastError());
 		exit(ERROR_CODE);
 	}
 	if (Receiver.ConnectionWithChannelThreadHandle != NULL) {
 		ret_val = CloseHandle(Receiver.ConnectionWithChannelThreadHandle);
 		if (FALSE == ret_val) {
-			printf("CloseSocketsThreadsAndWsaData failed to close ConnectionWithChannelThreadHandle.\n");
+			fprintf(stderr, "CloseSocketsThreadsAndWsaData failed to close ConnectionWithChannelThreadHandle.\n");
 			exit(ERROR_CODE);
 		}
 	}
 	if (Receiver.UserInterfaceThreadHandle != NULL) {
 		ret_val = CloseHandle(Receiver.UserInterfaceThreadHandle);
 		if (FALSE == ret_val) {
-			printf("CloseSocketsThreadsAndWsaData failed to close UserInterfaceThreadHandle.\n");
+			fprintf(stderr, "CloseSocketsThreadsAndWsaData failed to close UserInterfaceThreadHandle.\n");
 			exit(ERROR_CODE);
 		}
 	}
 	if (WSACleanup() == SOCKET_ERROR) {
-		printf("CloseSocketsThreadsAndWsaData Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
+		fprintf(stderr, "CloseSocketsThreadsAndWsaData Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
 		exit(ERROR_CODE);
 	}
 }

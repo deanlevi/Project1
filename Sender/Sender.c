@@ -18,7 +18,7 @@
 #define NUM_OF_BITS_IN_A_ROW_COLUMN 7
 #define SEND_RECEIVE_FLAGS 0
 #define MESSAGE_LENGTH 20
-#define SEND_MESSAGES_WAIT 100
+#define SEND_MESSAGES_WAIT 20
 
 void InitSender(char *argv[]);
 void AddErrorFixingBits(unsigned long long *DataToSend);
@@ -37,13 +37,13 @@ void InitSender(char *argv[]) {
 	WSADATA wsaData;
 	int StartupRes = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (StartupRes != NO_ERROR) {
-		printf("Error %ld at WSAStartup().\nExiting...\n", StartupRes);
+		fprintf(stderr, "Error %ld at WSAStartup().\nExiting...\n", StartupRes);
 		exit(ERROR_CODE);
 	}
 
 	Sender.ChannelSocket = socket(AF_INET, SOCK_DGRAM, SOCKET_PROTOCOL);
 	if (Sender.ChannelSocket == INVALID_SOCKET) {
-		printf("InitSender failed to create socket. Error Number is %d\n", WSAGetLastError());
+		fprintf(stderr, "InitSender failed to create socket. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -52,7 +52,7 @@ void InitSender(char *argv[]) {
 void HandleSendFile() {
 	FILE *InputFilePointer = fopen(Sender.InputFileToTransfer, "r");
 	if (InputFilePointer == NULL) {
-		printf("HandleSendFile couldn't open input file.\n");
+		fprintf(stderr, "HandleSendFile couldn't open input file.\n");
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -90,11 +90,11 @@ void SendData(unsigned long long DataToSend) {
 	int SentBufferLength = sendto(Sender.ChannelSocket, &DataToSend, OUTPUT_CHUNK_SIZE, SEND_RECEIVE_FLAGS,
 								 (SOCKADDR*)&Sender.ChannelSocketService, sizeof(Sender.ChannelSocketService));
 	if (SentBufferLength == SOCKET_ERROR) {
-		printf("SendData failed to sendto. Error Number is %d\n", WSAGetLastError());
+		fprintf(stderr, "SendData failed to sendto. Error Number is %d\n", WSAGetLastError());
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
 	}
-	printf("SendData sent %llu  Pure data is %llu\n", DataToSend, DataToSend & 0x1FFFFFFFFFFFF); // todo remove
+	fprintf(stderr, "SendData sent %llu  Pure data is %llu\n", DataToSend, DataToSend & 0x1FFFFFFFFFFFF); // todo remove
 	Sleep(SEND_MESSAGES_WAIT);
 }
 
@@ -131,7 +131,7 @@ void AddErrorFixingBits(unsigned long long *DataToSend) {
 	BindingReturnValue = bind(Sender.ChannelSocket, (SOCKADDR*)&Sender.ChannelSocketService,
 							  sizeof(Sender.ChannelSocketService));
 	if (BindingReturnValue != BINDING_SUCCEEDED) {
-		printf("BindToPort failed to bind.\n");
+		fprintf(stderr, "BindToPort failed to bind.\n");
 		CloseSocketsAndWsaData();
 		exit(ERROR_CODE);
 	}
@@ -150,7 +150,7 @@ void HandleReceiveFromChannel() {
 		Readfds = Allfds;
 		Status = select(0, &Readfds, NULL, NULL, NULL);
 		if (Status == SOCKET_ERROR) {
-			printf("HandleReceiveFromChannel select failure. Error Number is %d\n", WSAGetLastError());
+			fprintf(stderr, "HandleReceiveFromChannel select failure. Error Number is %d\n", WSAGetLastError());
 			CloseSocketsAndWsaData();
 			exit(ERROR_CODE);
 		}
@@ -161,7 +161,7 @@ void HandleReceiveFromChannel() {
 			if (FD_ISSET(Sender.ChannelSocket, &Readfds)) {
 				ReceivedBufferLength = recvfrom(Sender.ChannelSocket, MessageFromChannel, MESSAGE_LENGTH, SEND_RECEIVE_FLAGS, NULL, NULL);
 				if (ReceivedBufferLength == SOCKET_ERROR) {
-					printf("HandleReceiveFromChannel failed to recvfrom. Error Number is %d\n", WSAGetLastError());
+					fprintf(stderr, "HandleReceiveFromChannel failed to recvfrom. Error Number is %d\n", WSAGetLastError());
 					CloseSocketsAndWsaData();
 					exit(ERROR_CODE);
 				}
@@ -169,7 +169,7 @@ void HandleReceiveFromChannel() {
 			}
 		}
 	}
-	printf("HandleReceiveFromChannel received from receiver %s\n", MessageFromChannel); // todo remove
+	fprintf(stderr, "HandleReceiveFromChannel received from receiver %s\n", MessageFromChannel); // todo remove
 	int NumberOfReceivedBytes, NumberOfWrittenBytes, NumberOfErrorsDetected, NumberOfErrorsCorrected;
 	int StartIndex = 0, EndIndex = 0;
 
@@ -198,11 +198,11 @@ void CloseSocketsAndWsaData() {
 	int CloseSocketReturnValue;
 	CloseSocketReturnValue = closesocket(Sender.ChannelSocket); // todo add if adding more sockets
 	if (CloseSocketReturnValue == SOCKET_ERROR) {
-		printf("CloseSocketsAndWsaData failed to close socket. Error Number is %d\n", WSAGetLastError());
+		fprintf(stderr, "CloseSocketsAndWsaData failed to close socket. Error Number is %d\n", WSAGetLastError());
 		exit(ERROR_CODE);
 	}
 	if (WSACleanup() == SOCKET_ERROR) {
-		printf("CloseSocketsAndWsaData Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
+		fprintf(stderr, "CloseSocketsAndWsaData Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
 		exit(ERROR_CODE);
 	}
 }

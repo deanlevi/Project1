@@ -21,6 +21,8 @@ typedef struct _ChannelProperties {
 	SOCKADDR_IN ChannelSocketService;
 
 	SOCKADDR_IN SenderSocketService;
+	int NumberOfReceivedBytes;
+	int NumberOfFlippedBits;
 }ChannelProperties;
 
 ChannelProperties Channel;
